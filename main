@@ -1,0 +1,211 @@
+--[[
+    BROOKHAVEN EASTER 2026 - ULTIMATE OPTIMIZED TELEPORT FARM
+    - FPS Dostu & Akıllı Işınlanma (Teleport)
+    - Otomatik Zorluk Geçişi (Full Max)
+    - Radar, VIP & Hızlı Bitirme Entegre
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+
+-- Modül Yüklemeleri
+local Remotes = require(ReplicatedStorage.Packages.Remotes)
+local EggHuntController = require(ReplicatedStorage.Modules.Client.LiveOps.EggHuntController)
+local EggHunts = require(ReplicatedStorage.Modules.Shared.LiveOps.EggHunts)
+
+-- UI Ayarları & Değişkenler
+local _G = {
+    FarmEnabled = false,
+    TeleportEnabled = true, -- Yumurtalara ışınlanma özelliği
+    TargetDifficulty = "Easy",
+    FPS_Optimizer = true,
+    AutoNextDifficulty = false -- Bir zorluk bitince diğerine geç
+}
+
+-- UI Oluşturma
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Easter2026_TeleportEdition"
+ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 260, 0, 450)
+Main.Position = UDim2.new(0.8, 0, 0.4, -225)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+Main.Active = true
+Main.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Text = "EASTER 2026 - TELEPORT"
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
+Title.Parent = Main
+
+-- Işınlanma Fonksiyonu
+local function TeleportTo(cframe)
+    if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        localPlayer.Character.HumanoidRootPart.CFrame = cframe
+    end
+end
+
+-- Fonksiyonlar: Yumurtaları Bul
+local function GetActiveEggs()
+    local eggs = {}
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "EggHuntCollectable" or v:HasTag("EggHuntCollectable") then
+            if not v:GetAttribute("Collected") then
+                table.insert(eggs, v)
+            end
+        end
+    end
+    return eggs
+end
+
+-- Ana Farm Döngüsü
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        
+        if _G.FarmEnabled then
+            -- 1. Zorluk Kontrolü
+            local currentDiff = localPlayer:GetAttribute("EggHuntDifficulty")
+            if currentDiff ~= _G.TargetDifficulty then
+                Remotes.fireServer("ChangeDifficulty", _G.TargetDifficulty)
+                task.wait(1)
+            end
+            
+            -- 2. Toplama ve Işınlanma
+            local eggs = GetActiveEggs()
+            for i, egg in ipairs(eggs) do
+                if not _G.FarmEnabled then break end
+                
+                -- Eğer Işınlanma Açıksa
+                if _G.TeleportEnabled and egg:IsA("BasePart") then
+                    TeleportTo(egg.CFrame * CFrame.new(0, 2, 0))
+                    task.wait(0.1) -- Sunucu algılaması için kısa es
+                end
+                
+                -- Toplama Sinyali
+                Remotes.invokeServer("EggCollected", egg.Name)
+                
+                -- Lag Engelleme
+                if i % 2 == 0 and _G.FPS_Optimizer then
+                    task.wait(0.05)
+                end
+            end
+            
+            -- 3. Otomatik Bitirme ve Sonraki Zorluk (Full Max)
+            local collected = localPlayer:GetAttribute("EggsCollectedCount") or 0
+            local needed = EggHunts.DifficultyData[_G.TargetDifficulty].EggsNeeded
+            
+            if collected >= needed then
+                print("[EASTER]: Zorluk Tamamlandı: ", _G.TargetDifficulty)
+                EggHuntController.EndHunt()
+                task.wait(2)
+                
+                -- Eğer Otomatik Sonraki Zorluk Açıksa
+                if _G.AutoNextDifficulty then
+                    if _G.TargetDifficulty == "Easy" then _G.TargetDifficulty = "Medium"
+                    elseif _G.TargetDifficulty == "Medium" then _G.TargetDifficulty = "Hard"
+                    elseif _G.TargetDifficulty == "Hard" then _G.TargetDifficulty = "Eggstreme"
+                    else
+                        _G.FarmEnabled = false -- Hepsi bitti
+                        print("TÜM ZORLUKLAR BİTTİ - FULL MAX!")
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- UI Düğmeleri Oluşturucu
+local function AddButton(text, pos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = pos
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.Parent = Main
+    
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 4)
+    c.Parent = btn
+    
+    btn.Activated:Connect(function() callback(btn) end)
+    return btn
+end
+
+-- 1. Farm Toggle
+AddButton("Farm + Teleport: KAPALI", UDim2.new(0.05, 0, 0.12, 0), function(b)
+    _G.FarmEnabled = not _G.FarmEnabled
+    b.Text = _G.FarmEnabled and "Farm + Teleport: AÇIK" or "Farm + Teleport: KAPALI"
+    b.BackgroundColor3 = _G.FarmEnabled and Color3.fromRGB(0, 150, 70) or Color3.fromRGB(40, 40, 45)
+end)
+
+-- 2. Full Max Modu (Hepsini sırayla yapar)
+AddButton("Full Max Modu: KAPALI", UDim2.new(0.05, 0, 0.23, 0), function(b)
+    _G.AutoNextDifficulty = not _G.AutoNextDifficulty
+    b.Text = _G.AutoNextDifficulty and "Full Max Modu: AÇIK" or "Full Max Modu: KAPALI"
+    b.BackgroundColor3 = _G.AutoNextDifficulty and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(40, 40, 45)
+end)
+
+-- 3. Zorluk Seçimi
+local diffs = {"Easy", "Medium", "Hard", "Eggstreme"}
+local dIdx = 1
+local diffBtn = AddButton("Hedef: Easy", UDim2.new(0.05, 0, 0.34, 0), function(b)
+    dIdx = dIdx + 1
+    if dIdx > #diffs then dIdx = 1 end
+    _G.TargetDifficulty = diffs[dIdx]
+    b.Text = "Hedef: " .. _G.TargetDifficulty
+end)
+
+-- 4. Radar & VIP Unlock
+AddButton("Radar & VIP Aktif Et", UDim2.new(0.05, 0, 0.45, 0), function(b)
+    EggHuntController.UnlockRadar()
+    b.Text = "Özellikler Açıldı!"
+end)
+
+-- 5. Hızlı Bitir
+AddButton("Hızlı Bitir (End Hunt)", UDim2.new(0.05, 0, 0.56, 0), function()
+    EggHuntController.EndHunt()
+end)
+
+-- 6. Lag Fix
+AddButton("FPS Optimizer: AÇIK", UDim2.new(0.05, 0, 0.67, 0), function(b)
+    _G.FPS_Optimizer = not _G.FPS_Optimizer
+    b.Text = _G.FPS_Optimizer and "FPS Optimizer: AÇIK" or "FPS Optimizer: KAPALI"
+end)
+
+-- Bilgi Etiketi
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, 0, 0, 30)
+Status.Position = UDim2.new(0, 0, 0.85, 0)
+Status.Text = "Status: Hazır"
+Status.TextColor3 = Color3.fromRGB(200, 200, 200)
+Status.Font = Enum.Font.Gotham
+Status.TextSize = 12
+Status.BackgroundTransparency = 1
+Status.Parent = Main
+
+-- Kapatma
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.new(0, 20, 0, 20)
+Close.Position = UDim2.new(1, -25, 0, 5)
+Close.Text = "X"
+Close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+Close.Parent = Main
+Close.Activated:Connect(function() ScreenGui:Destroy() end)
+
+print("Brookhaven Easter 2026 - Teleport & Full Max Mod Loaded")
