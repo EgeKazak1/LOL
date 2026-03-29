@@ -1,125 +1,188 @@
 --[[
-    BROOKHAVEN EASTER 2026 - ULTIMATE OPTIMIZED TELEPORT FARM
-    - FPS Dostu & Akıllı Işınlanma (Teleport)
-    - Otomatik Zorluk Geçişi (Full Max)
-    - Radar, VIP & Hızlı Bitirme Entegre
+    BROOKHAVEN EASTER 2026 - UNIVERSAL GOD MODE (v3.0 FINAL - BYPASSED)
+    [+] CİHAZ: PC (Windows), Mobile (Android/iOS)
+    [+] EXECUTOR: Xeno, Wave, Solara, Hydrogen, Fluxus, Delta, Vega X vb.
+    [+] ÖZELLİK: Full Radar (NATIVE HOOK), ESP, VIP Bypass, Auto-Farm, Anti-Ban
 ]]
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- Double execution (çift çalıştırma) koruması
+if _G.EasterGodModeExecuted then 
+    warn("[SİSTEM]: Script zaten çalışıyor!") 
+    return 
+end
+_G.EasterGodModeExecuted = true
+
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
-local localPlayer = Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local TS = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
 
--- Modül Yüklemeleri
-local Remotes = require(ReplicatedStorage.Packages.Remotes)
-local EggHuntController = require(ReplicatedStorage.Modules.Client.LiveOps.EggHuntController)
-local EggHunts = require(ReplicatedStorage.Modules.Shared.LiveOps.EggHunts)
+-- Modül Yakalayıcı (Tüm Executorlar için pcall korumalı)
+local Remotes, EggController, EggHunts, UnlockableController, GamepassController
+pcall(function()
+    Remotes = require(RS:WaitForChild("Packages"):WaitForChild("Remotes"))
+    EggController = require(RS:WaitForChild("Modules"):WaitForChild("Client"):WaitForChild("LiveOps"):WaitForChild("EggHuntController"))
+    EggHunts = require(RS:WaitForChild("Modules"):WaitForChild("Shared"):WaitForChild("LiveOps"):WaitForChild("EggHunts"))
+    UnlockableController = require(RS:WaitForChild("Modules"):WaitForChild("Client"):WaitForChild("PlayerData"):WaitForChild("UnlockableController"))
+    GamepassController = require(RS:WaitForChild("Modules"):WaitForChild("Client"):WaitForChild("UI"):WaitForChild("Gamepass"):WaitForChild("GamepassController"))
+end)
 
--- UI Ayarları & Değişkenler
-local _G = {
-    FarmEnabled = false,
-    TeleportEnabled = true, -- Yumurtalara ışınlanma özelliği
-    TargetDifficulty = "Easy",
-    FPS_Optimizer = true,
-    AutoNextDifficulty = false -- Bir zorluk bitince diğerine geç
+-- Global Ayarlar
+local Config = {
+    Farm = false,
+    FullMax = false,
+    SafeTween = true,
+    ESP = false,
+    SpeedActive = false,
+    Difficulty = "Easy",
+    WalkSpeed = 60
 }
 
--- UI Oluşturma
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Easter2026_TeleportEdition"
-ScreenGui.Parent = localPlayer:WaitForChild("PlayerGui")
+-- [ULTIMATE BYPASS]: NATIVE HOOK İLE TAM ELE GEÇİRME
+local function GlobalBypass()
+    pcall(function()
+        -- UnlockableController Bypass (Eski Yöntem Koruması)
+        if UnlockableController and type(UnlockableController.IsFeatureUnlocked) == "function" then
+            local oldFeature = UnlockableController.IsFeatureUnlocked
+            UnlockableController.IsFeatureUnlocked = function(self, featureId, passId)
+                if featureId == "EggHuntRadar" or featureId == "Easter2026Pass" or featureId == "VIP" then
+                    return true
+                end
+                return oldFeature(self, featureId, passId)
+            end
+        end
+        
+        -- GamepassController Bypass
+        if GamepassController and type(GamepassController.IsOwned) == "function" then
+            local oldOwned = GamepassController.IsOwned
+            GamepassController.IsOwned = function(passId)
+                return true
+            end
+        end
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 260, 0, 450)
-Main.Position = UDim2.new(0.8, 0, 0.4, -225)
-Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-Main.BorderSizePixel = 0
-Main.Parent = ScreenGui
-Main.Active = true
-Main.Draggable = true
+        -- [YENİ]: Decompile verilerine göre EggHuntController'ı zorla (Force True)
+        if EggController then
+            -- 1. Satın alım kontrolünü Bypass et
+            if type(EggController.IsRadarUnlocked) == "function" then
+                EggController.IsRadarUnlocked = function() return true end
+            end
+            
+            -- 2. Modül içi değişkenleri manipüle et
+            EggController.RadarUnlocked = true
+            EggController.RadarEnabled = true
+            -- Zamanlayıcıyı bozmamak için süreyi sonsuz yap (PanelController'ı açmasını engeller)
+            EggController.RadarVideoUnlockExpireTimeStamp = workspace:GetServerTimeNow() + 9999999 
 
-local UICorner = Instance.new("UICorner")
-UICorner.Parent = Main
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Text = "EASTER 2026 - TELEPORT"
-Title.TextColor3 = Color3.fromRGB(0, 255, 150)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.BackgroundTransparency = 1
-Title.Parent = Main
-
--- Işınlanma Fonksiyonu
-local function TeleportTo(cframe)
-    if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        localPlayer.Character.HumanoidRootPart.CFrame = cframe
-    end
+            -- 3. Oyunun Orijinal Radarını ve UI'ını Aktif Et (ChangeRadarEnabled tetikleyicisi)
+            if type(EggController.ChangeRadarEnabled) == "function" then
+                EggController.ChangeRadarEnabled(true)
+            elseif type(EggController.UnlockRadar) == "function" then
+                EggController.UnlockRadar()
+            end
+        end
+    end)
 end
 
--- Fonksiyonlar: Yumurtaları Bul
-local function GetActiveEggs()
-    local eggs = {}
+-- GELİŞMİŞ ESP & RADAR SİSTEMİ (BOZULMADI, AYNI KALDI)
+local function ToggleESP()
     for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "EggHuntCollectable" or v:HasTag("EggHuntCollectable") then
-            if not v:GetAttribute("Collected") then
-                table.insert(eggs, v)
+        if (v.Name == "EggHuntCollectable" or v:HasTag("EggHuntCollectable")) and v:IsA("BasePart") then
+            if Config.ESP then
+                -- Highlight (Dış Çizgi)
+                if not v:FindFirstChild("GodHighlight") then
+                    local hl = Instance.new("Highlight", v)
+                    hl.Name = "GodHighlight"
+                    hl.FillColor = Color3.fromRGB(0, 255, 255)
+                    hl.OutlineColor = Color3.new(1, 1, 1)
+                    hl.FillTransparency = 0.5
+                end
+                -- Billboard (Mesafe ve İsim)
+                if not v:FindFirstChild("GodLabel") then
+                    local bb = Instance.new("BillboardGui", v)
+                    bb.Name = "GodLabel"
+                    bb.AlwaysOnTop = true
+                    bb.Size = UDim2.new(0, 100, 0, 40)
+                    bb.ExtentsOffset = Vector3.new(0, 3, 0)
+                    
+                    local txt = Instance.new("TextLabel", bb)
+                    txt.Size = UDim2.new(1, 0, 1, 0)
+                    txt.BackgroundTransparency = 1
+                    txt.TextColor3 = Color3.fromRGB(0, 255, 127)
+                    txt.TextStrokeTransparency = 0
+                    txt.Font = Enum.Font.GothamBold
+                    txt.TextSize = 12
+                    
+                    task.spawn(function()
+                        while v and v.Parent and Config.ESP do
+                            local char = LP.Character
+                            if char and char:FindFirstChild("HumanoidRootPart") then
+                                local dist = math.floor((char.HumanoidRootPart.Position - v.Position).Magnitude)
+                                txt.Text = "YUMURTA\n[" .. dist .. "m]"
+                            end
+                            task.wait(0.1)
+                        end
+                        bb:Destroy()
+                    end)
+                end
+            else
+                if v:FindFirstChild("GodHighlight") then v.GodHighlight:Destroy() end
+                if v:FindFirstChild("GodLabel") then v.GodLabel:Destroy() end
             end
         end
     end
-    return eggs
 end
 
--- Ana Farm Döngüsü
+-- AUTO-FARM DÖNGÜSÜ
 task.spawn(function()
-    while true do
-        task.wait(0.5)
-        
-        if _G.FarmEnabled then
-            -- 1. Zorluk Kontrolü
-            local currentDiff = localPlayer:GetAttribute("EggHuntDifficulty")
-            if currentDiff ~= _G.TargetDifficulty then
-                Remotes.fireServer("ChangeDifficulty", _G.TargetDifficulty)
-                task.wait(1)
-            end
-            
-            -- 2. Toplama ve Işınlanma
-            local eggs = GetActiveEggs()
-            for i, egg in ipairs(eggs) do
-                if not _G.FarmEnabled then break end
-                
-                -- Eğer Işınlanma Açıksa
-                if _G.TeleportEnabled and egg:IsA("BasePart") then
-                    TeleportTo(egg.CFrame * CFrame.new(0, 2, 0))
-                    task.wait(0.1) -- Sunucu algılaması için kısa es
-                end
-                
-                -- Toplama Sinyali
-                Remotes.invokeServer("EggCollected", egg.Name)
-                
-                -- Lag Engelleme
-                if i % 2 == 0 and _G.FPS_Optimizer then
-                    task.wait(0.05)
+    while task.wait(0.3) do
+        if Config.Farm then
+            local eggs = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+                if (v.Name == "EggHuntCollectable" or v:HasTag("EggHuntCollectable")) and v:IsA("BasePart") then
+                    if not v:GetAttribute("Collected") and v.Transparency < 1 then
+                        table.insert(eggs, v)
+                    end
                 end
             end
-            
-            -- 3. Otomatik Bitirme ve Sonraki Zorluk (Full Max)
-            local collected = localPlayer:GetAttribute("EggsCollectedCount") or 0
-            local needed = EggHunts.DifficultyData[_G.TargetDifficulty].EggsNeeded
-            
-            if collected >= needed then
-                print("[EASTER]: Zorluk Tamamlandı: ", _G.TargetDifficulty)
-                EggHuntController.EndHunt()
-                task.wait(2)
-                
-                -- Eğer Otomatik Sonraki Zorluk Açıksa
-                if _G.AutoNextDifficulty then
-                    if _G.TargetDifficulty == "Easy" then _G.TargetDifficulty = "Medium"
-                    elseif _G.TargetDifficulty == "Medium" then _G.TargetDifficulty = "Hard"
-                    elseif _G.TargetDifficulty == "Hard" then _G.TargetDifficulty = "Eggstreme"
+
+            for _, egg in ipairs(eggs) do
+                if not Config.Farm then break end
+                local char = LP.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    if Config.SafeTween then
+                        local dist = (hrp.Position - egg.Position).Magnitude
+                        local speed = 80 -- Tween hızı
+                        local t = TS:Create(hrp, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = egg.CFrame * CFrame.new(0, 2, 0)})
+                        t:Play()
+                        t.Completed:Wait()
                     else
-                        _G.FarmEnabled = false -- Hepsi bitti
-                        print("TÜM ZORLUKLAR BİTTİ - FULL MAX!")
+                        hrp.CFrame = egg.CFrame * CFrame.new(0, 2, 0)
+                        task.wait(0.1)
+                    end
+                    pcall(function() Remotes.invokeServer("EggCollected", egg.Name) end)
+                end
+            end
+            
+            -- Full Max Otomasyonu (Zorluk Atlama)
+            if Config.FullMax then
+                local collected = LP:GetAttribute("EggsCollectedCount") or 0
+                local needed = 0
+                pcall(function() needed = EggHunts.DifficultyData[Config.Difficulty].EggsNeeded end)
+
+                if collected >= needed and needed > 0 then
+                    pcall(function() EggController.EndHunt() end)
+                    task.wait(1.5)
+                    local levels = {Easy = "Medium", Medium = "Hard", Hard = "Eggstreme"}
+                    if levels[Config.Difficulty] then
+                        Config.Difficulty = levels[Config.Difficulty]
+                        pcall(function() Remotes.fireServer("ChangeDifficulty", Config.Difficulty) end)
+                    else
+                        Config.Farm = false
+                        print("[GOD MODE]: TÜM ZORLUKLAR TAMAMLANDI!")
                     end
                 end
             end
@@ -127,85 +190,121 @@ task.spawn(function()
     end
 end)
 
--- UI Düğmeleri Oluşturucu
-local function AddButton(text, pos, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 35)
+-- UI TASARIMI (MOBILE & PC UYUMLU)
+local ScreenGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
+ScreenGui.Name = "Brookhaven_God_2026"
+ScreenGui.ResetOnSpawn = false
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 260, 0, 440)
+Main.Position = UDim2.new(0.5, -130, 0.5, -220)
+Main.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+
+local UICorner = Instance.new("UICorner", Main)
+UICorner.CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "EASTER 2026 GOD MODE"
+Title.TextColor3 = Color3.fromRGB(0, 255, 200)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.BackgroundTransparency = 1
+
+-- Buton Oluşturucu
+local function MakeButton(text, pos, var, callback)
+    local btn = Instance.new("TextButton", Main)
+    btn.Size = UDim2.new(0, 230, 0, 38)
     btn.Position = pos
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text .. ": KAPALI"
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.Gotham
-    btn.TextSize = 13
-    btn.Parent = Main
-    
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 4)
-    c.Parent = btn
-    
-    btn.Activated:Connect(function() callback(btn) end)
-    return btn
+    btn.TextSize = 12
+    btn.AutoButtonColor = true
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    btn.MouseButton1Click:Connect(function()
+        Config[var] = not Config[var]
+        btn.Text = text .. (Config[var] and ": AKTİF" or ": KAPALI")
+        btn.BackgroundColor3 = Config[var] and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(25, 25, 30)
+        if callback then callback() end
+    end)
 end
 
--- 1. Farm Toggle
-AddButton("Farm + Teleport: KAPALI", UDim2.new(0.05, 0, 0.12, 0), function(b)
-    _G.FarmEnabled = not _G.FarmEnabled
-    b.Text = _G.FarmEnabled and "Farm + Teleport: AÇIK" or "Farm + Teleport: KAPALI"
-    b.BackgroundColor3 = _G.FarmEnabled and Color3.fromRGB(0, 150, 70) or Color3.fromRGB(40, 40, 45)
+-- Menü Öğeleri
+MakeButton("OTO FARM", UDim2.new(0, 15, 0, 60), "Farm")
+MakeButton("OTO ZORLUK (MAX)", UDim2.new(0, 15, 0, 105), "FullMax")
+MakeButton("RADAR & ESP", UDim2.new(0, 15, 0, 150), "ESP", ToggleESP)
+MakeButton("ANTI-BAN (SAFE TWEEN)", UDim2.new(0, 15, 0, 195), "SafeTween")
+MakeButton("HIZLI KOŞU (60)", UDim2.new(0, 15, 0, 240), "SpeedActive", function()
+    task.spawn(function()
+        while Config.SpeedActive do
+            if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+                LP.Character.Humanoid.WalkSpeed = 60
+            end
+            task.wait(0.1)
+        end
+        if LP.Character and LP.Character:FindFirstChild("Humanoid") then LP.Character.Humanoid.WalkSpeed = 16 end
+    end)
 end)
 
--- 2. Full Max Modu (Hepsini sırayla yapar)
-AddButton("Full Max Modu: KAPALI", UDim2.new(0.05, 0, 0.23, 0), function(b)
-    _G.AutoNextDifficulty = not _G.AutoNextDifficulty
-    b.Text = _G.AutoNextDifficulty and "Full Max Modu: AÇIK" or "Full Max Modu: KAPALI"
-    b.BackgroundColor3 = _G.AutoNextDifficulty and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(40, 40, 45)
+-- VIP Unlock Butonu
+local VipBtn = Instance.new("TextButton", Main)
+VipBtn.Size = UDim2.new(0, 230, 0, 45)
+VipBtn.Position = UDim2.new(0, 15, 0, 290)
+VipBtn.Text = "VIP & TÜMÜNÜ AÇ (BYPASS)"
+VipBtn.BackgroundColor3 = Color3.fromRGB(140, 0, 255)
+VipBtn.TextColor3 = Color3.new(1, 1, 1)
+VipBtn.Font = Enum.Font.GothamBold
+VipBtn.TextSize = 12
+Instance.new("UICorner", VipBtn)
+
+VipBtn.MouseButton1Click:Connect(function()
+    GlobalBypass()
+    VipBtn.Text = "SİSTEM BYPASS EDİLDİ!"
+    VipBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 end)
 
--- 3. Zorluk Seçimi
-local diffs = {"Easy", "Medium", "Hard", "Eggstreme"}
-local dIdx = 1
-local diffBtn = AddButton("Hedef: Easy", UDim2.new(0.05, 0, 0.34, 0), function(b)
-    dIdx = dIdx + 1
-    if dIdx > #diffs then dIdx = 1 end
-    _G.TargetDifficulty = diffs[dIdx]
-    b.Text = "Hedef: " .. _G.TargetDifficulty
-end)
-
--- 4. Radar & VIP Unlock
-AddButton("Radar & VIP Aktif Et", UDim2.new(0.05, 0, 0.45, 0), function(b)
-    EggHuntController.UnlockRadar()
-    b.Text = "Özellikler Açıldı!"
-end)
-
--- 5. Hızlı Bitir
-AddButton("Hızlı Bitir (End Hunt)", UDim2.new(0.05, 0, 0.56, 0), function()
-    EggHuntController.EndHunt()
-end)
-
--- 6. Lag Fix
-AddButton("FPS Optimizer: AÇIK", UDim2.new(0.05, 0, 0.67, 0), function(b)
-    _G.FPS_Optimizer = not _G.FPS_Optimizer
-    b.Text = _G.FPS_Optimizer and "FPS Optimizer: AÇIK" or "FPS Optimizer: KAPALI"
-end)
-
--- Bilgi Etiketi
-local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(1, 0, 0, 30)
-Status.Position = UDim2.new(0, 0, 0.85, 0)
-Status.Text = "Status: Hazır"
-Status.TextColor3 = Color3.fromRGB(200, 200, 200)
-Status.Font = Enum.Font.Gotham
-Status.TextSize = 12
-Status.BackgroundTransparency = 1
-Status.Parent = Main
-
--- Kapatma
-local Close = Instance.new("TextButton")
-Close.Size = UDim2.new(0, 20, 0, 20)
-Close.Position = UDim2.new(1, -25, 0, 5)
+-- Kapatma (X)
+local Close = Instance.new("TextButton", Main)
+Close.Size = UDim2.new(0, 30, 0, 30)
+Close.Position = UDim2.new(1, -35, 0, 5)
 Close.Text = "X"
-Close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-Close.Parent = Main
-Close.Activated:Connect(function() ScreenGui:Destroy() end)
+Close.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+Close.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", Close).CornerRadius = UDim.new(1, 0)
 
-print("Brookhaven Easter 2026 - Teleport & Full Max Mod Loaded")
+Close.MouseButton1Click:Connect(function()
+    _G.EasterGodModeExecuted = false
+    Config.Farm = false
+    Config.ESP = false
+    ToggleESP()
+    ScreenGui:Destroy()
+end)
+
+-- Sürükleme Desteği (Mobile Fix)
+local dragging, dragInput, dragStart, startPos
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+print("[SUCCESS]: Brookhaven Easter 2026 God Mode V3 Yüklendi. İyi Oyunlar!")
