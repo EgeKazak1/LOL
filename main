@@ -1,13 +1,12 @@
 --[[
-    BROOKHAVEN EASTER 2026 - UNIVERSAL GOD MODE (v3.0 FINAL - BYPASSED)
+    BROOKHAVEN EASTER 2026 - UNIVERSAL GOD MODE (v3.1 FINAL - INSTANT TP & ANTI-AFK)
     [+] CİHAZ: PC (Windows), Mobile (Android/iOS)
     [+] EXECUTOR: Xeno, Wave, Solara, Hydrogen, Fluxus, Delta, Vega X vb.
-    [+] ÖZELLİK: Full Radar (NATIVE HOOK), ESP, VIP Bypass, Auto-Farm, Anti-Ban
+    [+] ÖZELLİK: Full Radar (NATIVE HOOK), ESP, VIP Bypass, Instant Farm, Anti-AFK
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Double execution (çift çalıştırma) koruması
 if _G.EasterGodModeExecuted then 
     warn("[SİSTEM]: Script zaten çalışıyor!") 
     return 
@@ -16,11 +15,19 @@ _G.EasterGodModeExecuted = true
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
-local TS = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
+local VU = game:GetService("VirtualUser")
 local LP = Players.LocalPlayer
 
--- Modül Yakalayıcı (Tüm Executorlar için pcall korumalı)
+-- [ANTI-AFK SİSTEMİ]: 20 Dakika kicklenmesini engeller
+LP.Idled:Connect(function()
+    VU:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VU:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    print("[ANTI-AFK]: Kick engellendi!")
+end)
+
+-- Modül Yakalayıcı
 local Remotes, EggController, EggHunts, UnlockableController, GamepassController
 pcall(function()
     Remotes = require(RS:WaitForChild("Packages"):WaitForChild("Remotes"))
@@ -33,18 +40,18 @@ end)
 -- Global Ayarlar
 local Config = {
     Farm = false,
-    FullMax = false,
-    SafeTween = true,
     ESP = false,
     SpeedActive = false,
     Difficulty = "Easy",
     WalkSpeed = 60
 }
 
--- [ULTIMATE BYPASS]: NATIVE HOOK İLE TAM ELE GEÇİRME
+local Difficulties = {"Easy", "Medium", "Hard", "Eggstreme"}
+local DiffIndex = 1
+
+-- [ULTIMATE BYPASS]: NATIVE HOOK
 local function GlobalBypass()
     pcall(function()
-        -- UnlockableController Bypass (Eski Yöntem Koruması)
         if UnlockableController and type(UnlockableController.IsFeatureUnlocked) == "function" then
             local oldFeature = UnlockableController.IsFeatureUnlocked
             UnlockableController.IsFeatureUnlocked = function(self, featureId, passId)
@@ -55,28 +62,18 @@ local function GlobalBypass()
             end
         end
         
-        -- GamepassController Bypass
         if GamepassController and type(GamepassController.IsOwned) == "function" then
-            local oldOwned = GamepassController.IsOwned
-            GamepassController.IsOwned = function(passId)
-                return true
-            end
+            GamepassController.IsOwned = function(passId) return true end
         end
 
-        -- [YENİ]: Decompile verilerine göre EggHuntController'ı zorla (Force True)
         if EggController then
-            -- 1. Satın alım kontrolünü Bypass et
             if type(EggController.IsRadarUnlocked) == "function" then
                 EggController.IsRadarUnlocked = function() return true end
             end
-            
-            -- 2. Modül içi değişkenleri manipüle et
             EggController.RadarUnlocked = true
             EggController.RadarEnabled = true
-            -- Zamanlayıcıyı bozmamak için süreyi sonsuz yap (PanelController'ı açmasını engeller)
             EggController.RadarVideoUnlockExpireTimeStamp = workspace:GetServerTimeNow() + 9999999 
 
-            -- 3. Oyunun Orijinal Radarını ve UI'ını Aktif Et (ChangeRadarEnabled tetikleyicisi)
             if type(EggController.ChangeRadarEnabled) == "function" then
                 EggController.ChangeRadarEnabled(true)
             elseif type(EggController.UnlockRadar) == "function" then
@@ -86,12 +83,11 @@ local function GlobalBypass()
     end)
 end
 
--- GELİŞMİŞ ESP & RADAR SİSTEMİ (BOZULMADI, AYNI KALDI)
+-- GELİŞMİŞ ESP & RADAR SİSTEMİ
 local function ToggleESP()
     for _, v in pairs(workspace:GetDescendants()) do
         if (v.Name == "EggHuntCollectable" or v:HasTag("EggHuntCollectable")) and v:IsA("BasePart") then
             if Config.ESP then
-                -- Highlight (Dış Çizgi)
                 if not v:FindFirstChild("GodHighlight") then
                     local hl = Instance.new("Highlight", v)
                     hl.Name = "GodHighlight"
@@ -99,7 +95,6 @@ local function ToggleESP()
                     hl.OutlineColor = Color3.new(1, 1, 1)
                     hl.FillTransparency = 0.5
                 end
-                -- Billboard (Mesafe ve İsim)
                 if not v:FindFirstChild("GodLabel") then
                     local bb = Instance.new("BillboardGui", v)
                     bb.Name = "GodLabel"
@@ -135,9 +130,9 @@ local function ToggleESP()
     end
 end
 
--- AUTO-FARM DÖNGÜSÜ
+-- INSTANT TELEPORT FARM DÖNGÜSÜ
 task.spawn(function()
-    while task.wait(0.3) do
+    while task.wait(0.2) do
         if Config.Farm then
             local eggs = {}
             for _, v in pairs(workspace:GetDescendants()) do
@@ -153,44 +148,20 @@ task.spawn(function()
                 local char = LP.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 if hrp then
-                    if Config.SafeTween then
-                        local dist = (hrp.Position - egg.Position).Magnitude
-                        local speed = 80 -- Tween hızı
-                        local t = TS:Create(hrp, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = egg.CFrame * CFrame.new(0, 2, 0)})
-                        t:Play()
-                        t.Completed:Wait()
-                    else
-                        hrp.CFrame = egg.CFrame * CFrame.new(0, 2, 0)
-                        task.wait(0.1)
-                    end
+                    -- Direk Teleport (Tween kaldırıldı)
+                    hrp.CFrame = egg.CFrame * CFrame.new(0, 2, 0)
+                    
+                    -- Bug fix: Server'ın teleportu ve yumurtayı algılaması için milisaniyelik gecikme
+                    task.wait(0.15) 
+                    
                     pcall(function() Remotes.invokeServer("EggCollected", egg.Name) end)
-                end
-            end
-            
-            -- Full Max Otomasyonu (Zorluk Atlama)
-            if Config.FullMax then
-                local collected = LP:GetAttribute("EggsCollectedCount") or 0
-                local needed = 0
-                pcall(function() needed = EggHunts.DifficultyData[Config.Difficulty].EggsNeeded end)
-
-                if collected >= needed and needed > 0 then
-                    pcall(function() EggController.EndHunt() end)
-                    task.wait(1.5)
-                    local levels = {Easy = "Medium", Medium = "Hard", Hard = "Eggstreme"}
-                    if levels[Config.Difficulty] then
-                        Config.Difficulty = levels[Config.Difficulty]
-                        pcall(function() Remotes.fireServer("ChangeDifficulty", Config.Difficulty) end)
-                    else
-                        Config.Farm = false
-                        print("[GOD MODE]: TÜM ZORLUKLAR TAMAMLANDI!")
-                    end
                 end
             end
         end
     end
 end)
 
--- UI TASARIMI (MOBILE & PC UYUMLU)
+-- UI TASARIMI
 local ScreenGui = Instance.new("ScreenGui", LP:WaitForChild("PlayerGui"))
 ScreenGui.Name = "Brookhaven_God_2026"
 ScreenGui.ResetOnSpawn = false
@@ -214,12 +185,11 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.BackgroundTransparency = 1
 
--- Buton Oluşturucu
 local function MakeButton(text, pos, var, callback)
     local btn = Instance.new("TextButton", Main)
     btn.Size = UDim2.new(0, 230, 0, 38)
     btn.Position = pos
-    btn.Text = text .. ": KAPALI"
+    btn.Text = text .. (var and ": KAPALI" or "")
     btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     btn.TextColor3 = Color3.new(1, 1, 1)
     btn.Font = Enum.Font.Gotham
@@ -228,19 +198,34 @@ local function MakeButton(text, pos, var, callback)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
     btn.MouseButton1Click:Connect(function()
-        Config[var] = not Config[var]
-        btn.Text = text .. (Config[var] and ": AKTİF" or ": KAPALI")
-        btn.BackgroundColor3 = Config[var] and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(25, 25, 30)
-        if callback then callback() end
+        if var then
+            Config[var] = not Config[var]
+            btn.Text = text .. (Config[var] and ": AKTİF" or ": KAPALI")
+            btn.BackgroundColor3 = Config[var] and Color3.fromRGB(0, 180, 100) or Color3.fromRGB(25, 25, 30)
+        end
+        if callback then callback(btn) end
     end)
+    return btn
 end
 
 -- Menü Öğeleri
-MakeButton("OTO FARM", UDim2.new(0, 15, 0, 60), "Farm")
-MakeButton("OTO ZORLUK (MAX)", UDim2.new(0, 15, 0, 105), "FullMax")
+MakeButton("INSTANT OTO FARM", UDim2.new(0, 15, 0, 60), "Farm")
+
+-- Zorluk Seçici Buton
+MakeButton("ZORLUK: " .. Config.Difficulty, UDim2.new(0, 15, 0, 105), nil, function(btn)
+    DiffIndex = DiffIndex + 1
+    if DiffIndex > #Difficulties then DiffIndex = 1 end
+    
+    Config.Difficulty = Difficulties[DiffIndex]
+    btn.Text = "ZORLUK: " .. Config.Difficulty
+    
+    -- Server'a anında yeni zorluğu iletiyoruz
+    pcall(function() Remotes.fireServer("ChangeDifficulty", Config.Difficulty) end)
+end)
+
 MakeButton("RADAR & ESP", UDim2.new(0, 15, 0, 150), "ESP", ToggleESP)
-MakeButton("ANTI-BAN (SAFE TWEEN)", UDim2.new(0, 15, 0, 195), "SafeTween")
-MakeButton("HIZLI KOŞU (60)", UDim2.new(0, 15, 0, 240), "SpeedActive", function()
+
+MakeButton("HIZLI KOŞU (60)", UDim2.new(0, 15, 0, 195), "SpeedActive", function()
     task.spawn(function()
         while Config.SpeedActive do
             if LP.Character and LP.Character:FindFirstChild("Humanoid") then
@@ -286,7 +271,7 @@ Close.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Sürükleme Desteği (Mobile Fix)
+-- Sürükleme Desteği
 local dragging, dragInput, dragStart, startPos
 Main.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -307,4 +292,4 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
-print("[SUCCESS]: Brookhaven Easter 2026 God Mode V3 Yüklendi. İyi Oyunlar!")
+print("[SUCCESS]: Brookhaven Easter 2026 God Mode V3.1 Yüklendi. İyi Oyunlar!")
